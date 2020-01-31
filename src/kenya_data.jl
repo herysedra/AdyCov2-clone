@@ -1,8 +1,9 @@
 # Read in the data for the model
 
-
+using CSV
 function get_Kenyadata(filename)
-    KenyaTbl = readtable(filename)
+    #KenyaTbl = readtable(filename)
+    KenyaTbl = CSV.read(filename)
     KenyaTbl = KenyaTbl[1:(end-1),:]
     n, = size(KenyaTbl)
     #Equator conversion 1 deg lat = 110.57km, 1 deg long = 111.32 km
