@@ -1,7 +1,7 @@
 
 push!(LOAD_PATH, "/Users/Sam/GitHub/KenyaCoV/src")
 using Plots,Parameters,Distributions,DifferentialEquations,JLD2,DataFrames
-using Revise
+# using Revise
 using KenyaCoV
 
 """
