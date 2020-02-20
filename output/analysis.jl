@@ -110,7 +110,7 @@ CoV_ens_prob = EnsembleProblem(jump_prob_tl,
                 prob_func = randomise_params)
 sim_liu_treatment = solve(CoV_ens_prob,SimpleTauLeaping(),dt = 0.1,trajectories = 1000)
 
-@save "/Users/Sam/Documents/sim_liu_treatmentjld2" sim_liu_treatment
+@save "/Users/Sam/Documents/sim_liu_treatment.jld2" sim_liu_treatment
 times = sim_liu_no_treatment[1][1]
 
 sim_liu_no_treatment = 0
@@ -129,11 +129,16 @@ P.ϵ = 1.;
 P.ext_inf_rate = 0.;
 
 u0[30,3,1] += 1#One asymptomatic in Nairobi
-jump_prob_tl = create_KenyaCoV_prob(u0,(0.,180.),P)
+jump_prob_tl = create_KenyaCoV_prob(u0,(0.,365.),P)
 
 CoV_ens_prob = EnsembleProblem(jump_prob_tl,
                 output_func = output_infecteds_and_cum_by_county)
-sim_liu_no_treatment = solve(CoV_ens_prob,SimpleTauLeaping(),dt = 0.25,trajectories = 100)
+sim_liu_no_treatment = solve(CoV_ens_prob,SimpleTauLeaping(),dt = 0.1,trajectories = 1)
+sim = sim_liu_no_treatment.u
+y = [x[2] for x in sim]
+
+
+
 
 times = sim_liu_no_treatment[1][1]
 peaks = zeros(100,47)
@@ -157,3 +162,45 @@ CoV_ens_prob = EnsembleProblem(jump_prob_tl,
                 output_func = output_infecteds_and_cum_by_county)
 
 sim_liu_with_treatment = solve(CoV_ens_prob,SimpleTauLeaping(),dt = 0.25,trajectories = 100)
+
+
+#
+@load "/Users/Sam/Documents/sim_liu_treatment.jld2" sim_liu_treatment
+@load "/Users/Sam/Documents/sim_liu_no_treatment.jld2" sim_liu_no_treatment
+total_cases = [sum(s[2][end][:,3:4]) for s in sim_liu_no_treatment]
+total_cases_treatment = [sum(s[2][end][:,3:4]) for s in sim_liu_treatment]
+
+fig = boxplot(total_cases,lab = "No treatment")
+boxplot!(fig, total_cases_treatment,lab = "7 days post-symptoms isolation",
+                ylims = (0.,6e7),xticks = [],
+                ylabel = "total cases")
+plot!([1,2],[sum(u0),sum(u0)])
+savefig(fig,"totalcases.png")
+
+VectorOfArray(sim_liu_no_treatment[][2])
+times_no_t = sim_liu_no_treatment[1][1]
+forecasts_no_t = [VectorOfArray(s[2])[:,3:4,:] for s in sim_liu_no_treatment]
+
+total_epidemic = zeros(length(times_no_t),1000)
+for i = 1:1000
+    total_epidemic[:,i] = sum(forecasts_no_t[i],dims = [1,2])[:]
+end
+plot(times_no_t[2:end],diff(total_epidemic[:,2]),lab = "",ylabel = "cum. infs")
+
+
+
+
+for i = 1:500
+    y = sum(forecasts[i][:,:],dims =1)[:]
+    total_peaktimes[i] = times[argmax(y)]
+end
+@save "output/total_peaktimes.jld2" total_peaktimes
+matwrite("output/total_peaktimes.mat",Dict("total_peaktimes"=>total_peaktimes))
+
+peaktimes_by_county = zeros(500,47)
+for i = 1:500,j=1:47
+    y = forecasts[i][j,:]
+    peaktimes_by_county[i,j] = times[argmax(y)]
+end
+@save "output/peaktimes_by_county.jld2" peaktimes_by_county
+matwrite("output/peaktimes_by_county.mat",Dict("peaktimes_by_county"=>peaktimes_by_county))
