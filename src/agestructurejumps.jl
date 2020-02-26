@@ -37,16 +37,6 @@ Events for each wider area and age group:
 
 """
 
-dc_age = zeros(Int64,n_wa*n_a*n_s,n_ta*n*n_a)
-# asymp_indices = zeros(Bool,n_wa,n_a,n_s)
-# asymp_indices[:,:,3] .= true;
-# f_asymp_indices = findall(asymp_indices[:])
-# diseased_indices = zeros(Bool,n_wa,n_a,n_s)
-# diseased_indices[:,:,4] .= true;
-# f_diseased_indices = findall(diseased_indices[:])
-# asymp_indices = 0;#free memory
-# diseased_indices = 0;
-
 function calculate_infection_rates!(u,p::CoVParameters_AS,t)
     I_A = @view u[:,:,3]
     I_D = @view u[:,:,4]
