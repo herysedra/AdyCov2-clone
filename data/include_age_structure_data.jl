@@ -47,7 +47,14 @@ for i = 1:20,j=1:20
     movements_per_person[i,j] = mv_matrix[j,i]/1000#change to from col to row format for ease of multiplication with row vectors
 end
 heatmap(movements_per_person)
-ρ = [sum(movements_per_person,dims = 1)[j]*5/30 for j = 1:20]
+# ρ = [sum(movements_per_person,dims = 1)[j]*5/30 for j = 1:20]
+moves_out = [sum(movements_per_person,dims = 1)[j]*1/30 for j = 1:20]
+r = [1/5 for j = 1:20]
+l = [moves_out[i]*r[i]/(r[i] - moves_out[i]) for i = 1:20]
+bar(l)
+ρ = [l[i]/(r[i] + l[i]) for i = 1:20]
+bar(ρ)
+
 P_dest = zeros(20,20)#probability distribution of destination
 for j = 1:20
     P_dest[:,j] = LinearAlgebra.normalize(movements_per_person[:,j],1)

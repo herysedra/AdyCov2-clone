@@ -1,7 +1,8 @@
 
-function transportstructure_params!(P::CoVParameters,ρ::Vector{Float64},transport_matrix)
+function transportstructure_params!(P::AbstractCovParameters,ρ::Vector{Float64},transport_matrix)
    #Put in the correct location matrix
-   for i = 1:n,j = 1:n
+   d1,d2 = size(transport_matrix)
+   for i = 1:d1,j = 1:d2
        if i != j
            P.T[i,j] = P.ρ[j]*transport_matrix[i,j]
        else
@@ -11,30 +12,6 @@ function transportstructure_params!(P::CoVParameters,ρ::Vector{Float64},transpo
    return nothing
 end
 
-function transportstructure_params!(P::CoVParameters_AS,ρ::Vector{Float64},transport_matrix)
-   #Put in the correct location matrix
-   for i = 1:n_wa,j = 1:n_wa
-       if i != j
-           P.T[i,j] = P.ρ[j]*transport_matrix[i,j]
-       else
-           P.T[i,j] = 1-P.ρ[j]
-       end
-   end
-   return nothing
-end
-
-function transportstructure_params!(P::CoVParameters,ρ::Float64,transport_matrix)
-    P.ρ = ρ
-    #Put in the correct location matrix
-    for i = 1:n,j = 1:n
-        if i != j
-            P.T[i,j] = P.ρ*transport_matrix[i,j]
-        else
-            P.T[i,j] = 1-P.ρ
-        end
-    end
-    return nothing
-end
 
 
 
@@ -107,6 +84,25 @@ function model_ingredients_from_data(agestructuredata_filename,flight_filename,p
 
 end
 
+function generate_explicitmove_parameters(P::CoVParameters_AS,r::Vector{Float64},P_dest::Matrix{Float64})
+    P_copy = deepcopy(P)
+    l = [P_copy.ρ[i]*r[i]/(1-P_copy.ρ[i]) for i = 1:n_wa] #work out the leaving rate compatible with the return rate
+    _P = CoVParameters_AS_EM(χ = P_copy.χ,r=r,l=l,
+                            M= P_copy.M,into_mom = P_copy.into_mom, into_nai = P_copy.into_nai ,
+                            global_prev = P_copy.global_prev,dc = P_copy.dc,N̂=P_copy.N̂)
+    transportstructure_params!(_P,_P.ρ,P_dest)
+    return _P
+end
+
+function generate_explicitmove_parameters(P::CoVParameters_AS,r::Vector{Float64},l::Vector{Float64},P_dest::Matrix{Float64})
+    P_copy = deepcopy(P)
+    ρ = [l[i]/(l[i] + r[i]) for i = 1:n_wa] #work out the Proportion of time spent away
+    _P = CoVParameters_AS_EM(χ = P_copy.χ,r=r,l=l,ρ = ρ,
+                            M= P_copy.M,into_mom = P_copy.into_mom, into_nai = P_copy.into_nai ,
+                            global_prev = P_copy.global_prev,dc = P_copy.dc,N̂=P_copy.N̂)
+    transportstructure_params!(_P,_P.ρ,P_dest)
+    return _P
+end
 
 
 

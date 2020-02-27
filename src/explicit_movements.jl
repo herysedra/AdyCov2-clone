@@ -31,14 +31,15 @@ function generate_movements(u,p::CoVParameters_AS_EM,t)
     for k in index_as_em
         i,j,a,s = Tuple(k)
         moveprob = 0.
-        if a in mobile_age_indices && i!=j
+        if a in mobile_age_indices && i!=j && s in [1,2,3,4]
             moveprob = 1 - exp(-p.r[i]*p.dt) #Chance of returning
             p.du_moves[k] = rand(Binomial(u[k],moveprob ))
         end
-        if a in mobile_age_indices && i==j
+        if a in mobile_age_indices && i==j && s in [1,2,3,4]
             moveprob = 1 - exp(-p.l[i]*p.dt) #Chance of leaving
             p.du_moves[k] = rand(Binomial(u[k],moveprob ))
         end
+    end
 end
 
 function calculate_infection_rates!(u,p::CoVParameters_AS_EM,t)
