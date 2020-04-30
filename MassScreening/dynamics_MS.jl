@@ -233,20 +233,26 @@ function change_matrix(dc)
         if eventtype ==11# A->Q via screening
             ind_A = linear_as[i,a,4]
             ind_Q = linear_as[i,a,13]
+            ind_cumA = linear_as[i,a,9]
             dc[ind_A,k] = -1
             dc[ind_Q,k] = 1
+            dc[ind_cumA,k] = -1
         end
         if eventtype ==12# M->Q via screening
             ind_M = linear_as[i,a,5]
             ind_Q = linear_as[i,a,13]
+            ind_cumM = linear_as[i,a,10]
             dc[ind_M,k] = -1
             dc[ind_Q,k] = 1
+            dc[ind_cumM,k] = -1
         end
         if eventtype ==13# V->Qᵥ via screening
             ind_V = linear_as[i,a,6]
             ind_Qᵥ = linear_as[i,a,14]
+            ind_cumV = linear_as[i,a,11]
             dc[ind_V,k] = -1
             dc[ind_Qᵥ,k] = 1
+            dc[ind_cumV,k] = -1
         end
         if eventtype ==14# Q->R via screening
             ind_Q = linear_as[i,a,13]
@@ -257,8 +263,10 @@ function change_matrix(dc)
         if eventtype ==15# Qᵥ->H via screening
             ind_Qᵥ = linear_as[i,a,14]
             ind_H = linear_as[i,a,7]
+            ind_cumH = linear_as[i,a,12]
             dc[ind_Qᵥ,k] = -1
             dc[ind_H,k] = 1
+            dc[ind_cumH,k] = 1
         end
     end
 end
@@ -349,7 +357,7 @@ function nonneg_tauleap(du,u,p::CoVParameters_AS,t)
     @unpack dc,dN,poi_rates,du_linear = p
     rates(poi_rates,u,p,t) #calculate rates of underlying Poisson processes
     PP_drivers(dN,poi_rates,p)#Generate Poisson rvs with rates scaled by time step dt
-    max_change(dN,u,p)#Cap the size of the Poisson rvs to maintain non-negativity
+    #max_change(dN,u,p)#Cap the size of the Poisson rvs to maintain non-negativity
     mass_screening(dN,u,p,t)    #MS
     max_change(dN,u,p)          #MS
     mul!(du_linear,dc,dN)#Calculates the effect on the state in the inplace du vector
@@ -367,37 +375,29 @@ function mass_screening(dN,u,p::CoVParameters_AS,t)
     @unpack MS_strategy,MS_probaₐ,dt,MS_nb_testsₐ,MS_probaₐₛ= p
     wa=4    #tests in Nairobi only
     MS_nb_testsᵢ=Int(floor(MS_strategy[Int(ceil(t+1))]*dt))     #puttin all tests in Nairobi
+    if MS_nb_testsᵢ!=0
+        for a=1:n_a     MS_probaₐ[a]=(sum(u[wa,a,1:6])+u[wa,a,8])/(sum(u[wa,:,1:6])+sum(u[wa,:,8]));    end
+        MS_nb_testsₐ = rand(Multinomial(MS_nb_testsᵢ, MS_probaₐ))#LinearAlgebra.normalize!(MS_probaₐ,1) ))
 
-    #for a=1:n_a,s∈[1,2,3,4,5,6,8]     #calculating testing_uₚ
-    #    testing_uₚ[wa][a,s]=u[wa,a,s]/(sum(u[wa,:,1:6])+sum(u[wa,:,8]))
-    #end
-
-    #for a=1:n_a     probability_per_age[a]=sum(testing_uₚ[wa][a,:]);    end
-    for a=1:n_a     MS_probaₐ[a]=(sum(u[wa,a,1:6])+u[wa,a,8])/(sum(u[wa,:,1:6])+sum(u[wa,:,8]));    end
-    MS_nb_testsₐ = rand(Multinomial(MS_nb_testsᵢ, MS_probaₐ))#LinearAlgebra.normalize!(MS_probaₐ,1) ))
-
-    #test_indices_per_age=[random_choice(MS_probaₐ)     for i=1:nb_tests_per_wa]
-    #for a=1:n_a     nb_tests_per_age[a]=count(x->x==a,test_indices_per_age);    end
-    #=if t==140
-        println("\nMS_probaₐ=",MS_probaₐ)
-        println("\nMS_nb_testsₐ=",MS_nb_testsₐ)
-    end=#
-    for a=1:n_a
-        for s∈[1,2,3,4,5,6,8]   MS_probaₐₛ[a,s]=u[wa,a,s]/(sum(u[wa,a,1:6])+u[wa,a,8]); end  #we can test s∈{S,E,P,A,M,V,R} and !{Q,Qᵥ,H}
-        MS_nb_testsₛ = rand(Multinomial(MS_nb_testsₐ[a], MS_probaₐₛ[a,:]))
-        #test_indices_per_s=[random_choice(proba_per_s)  for i=1:nb_tests_per_age[a]]
-        #nb_tests_per_s=[count(x->x==i,test_indices_per_s)   for i=2:4]  #we only count for state=E,A,D
-        dN[linear_as_events[wa, a, 9]] = MS_nb_testsₛ[2] #s=E
-        dN[linear_as_events[wa, a, 10]]= MS_nb_testsₛ[3] #s=P
-        dN[linear_as_events[wa, a, 11]]= MS_nb_testsₛ[4] #s=A
-        dN[linear_as_events[wa, a, 12]]= MS_nb_testsₛ[5] #s=M
-        dN[linear_as_events[wa, a, 13]]= MS_nb_testsₛ[6] #s=V
         #=if t==140
-            println("\n\n\nAge=",a,"     proba_per_s=",proba_per_s)
-            println("\nnb_tests_per_s=",nb_tests_per_s)
-            s=0; println("\ndN=");for e=9:11     s+=dN[linear_as_events[wa, a, e]];print("    dN[4,",a,",",e,"]=",dN[linear_as_events[wa, a, e]])     end
-            println("\n--> Age=",a,"   total sN[9:11]=",s)
+            println("\nMS_probaₐ=",MS_probaₐ)
+            println("\nMS_nb_testsₐ=",MS_nb_testsₐ)
         end=#
+        for a=1:n_a
+            for s∈[1,2,3,4,5,6,8]   MS_probaₐₛ[a,s]=u[wa,a,s]/(sum(u[wa,a,1:6])+u[wa,a,8]); end  #we can test s∈{S,E,P,A,M,V,R} and !{Q,Qᵥ,H}
+            MS_nb_testsₛ = rand(Multinomial(MS_nb_testsₐ[a], MS_probaₐₛ[a,:]))
+            dN[linear_as_events[wa, a, 9]] = MS_nb_testsₛ[2] #s=E
+            dN[linear_as_events[wa, a, 10]]= MS_nb_testsₛ[3] #s=P
+            dN[linear_as_events[wa, a, 11]]= MS_nb_testsₛ[4] #s=A
+            dN[linear_as_events[wa, a, 12]]= MS_nb_testsₛ[5] #s=M
+            dN[linear_as_events[wa, a, 13]]= MS_nb_testsₛ[6] #s=V
+            #=if t==140
+                println("\n\n\nAge=",a,"     proba_per_s=",proba_per_s)
+                println("\nnb_tests_per_s=",nb_tests_per_s)
+                s=0; println("\ndN=");for e=9:11     s+=dN[linear_as_events[wa, a, e]];print("    dN[4,",a,",",e,"]=",dN[linear_as_events[wa, a, e]])     end
+                println("\n--> Age=",a,"   total sN[9:11]=",s)
+            end=#
+        end
     end
 end
 

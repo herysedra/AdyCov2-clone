@@ -14,42 +14,31 @@ end
 function output_daily_and_final_incidence(sol,i)
     times = sol.prob.tspan[1]:1:sol.prob.tspan[end] #time step = 1 day
     cumIs = [sum(sol(t)[:,:,9:11],dims = 2)[:,1,:]  for t in times] # only cumulative A, M and V
+    #Q=[[sum(sol(t)[wa,:,5],dims = 1)[:,1,:] #=+ sum(sol(t)[wa,:,11],dims = 1)[:,1,:]=#  for wa=1:20]  for t in times]      # Q = Q ##+ QS
     I=[[sum(sol(t)[wa,:,4:6],dims = 1)[:,1,:] #=+ sum(sol(t)[wa,:,5],dims = 1)[:,1,:] + sum(sol(t)[wa,:,6],dims = 1)[:,1,:]=#  for wa=1:20]  for t in times]      # I = A+M+V
     return [cumIs,I,sol[end][:,:,9:11]],false # save z (time series with only incidence with no age structure), and save the final distribution (end) age/space but no time
 end
 
-function run_set_scenarios(folder,session,scenarios,β,ϵ,n_traj,MS_strategies)
+function run_set_scenarios(folder,session,scenarios,R₀,n_traj,dt,MS_strategies)
     if !isdir(folder)   mkdir(folder)   end
     global sims_vector=[]
     for i=1:size(scenarios,1)
         sc_nb=session*100+scenarios[i]
         u0,P,P_dest = KenyaCoV_MS.model_ingredients_from_data("data/data_for_age_structuredmodel.jld2","data/flight_numbers.csv","data/projected_global_prevelance.csv")
-        #Redistribute susceptibility JUST to rescale infectiousness so we get the correct R₀/r
-        P.χ = ones(KenyaCoV_MS.n_a)
-        @load "data/detection_rates_for_different_taus.jld2" d_1
-        P.rel_detection_rate = d_1
-        P.dt = 0.25;
-        P.ext_inf_rate = 0.;
-        P.ϵ = ϵ#1.#Asymp are as infectious as symptomatics
-        #Set the susceptibility vector --- just to specify the correct R₀
-        sus_matrix = repeat(P.χ,1,17)
-        R_A = P.ϵ*((1/P.σ₂) + (1/P.γ) ) #effective duration of asymptomatic
-        R_M = (P.ϵ/P.σ₂) + (P.ϵ_D/P.γ) #effective duration of mild
-        R_V = (P.ϵ/P.σ₂) + (P.ϵ_V/P.τ) #effective duration of severe
-        R_vector = [(1-P.rel_detection_rate[a])*R_A + P.rel_detection_rate[a]*(1-P.hₐ[a])*R_M + P.rel_detection_rate[a]*P.hₐ[a]*R_V for a = 1:17]
-        inf_matrix = repeat(R_vector',17,1)
-
-        eigs, = eigen(sus_matrix.*P.M.*inf_matrix)
-        max_eigval = Real(eigs[end])
-        P.χ = ones(KenyaCoV_MS.n_a)/max_eigval
-        P.β = β #rand(KenyaCoV.d_R₀) #Choose R₀ randomly from 2-3 range
-        u0[KenyaCoV_MS.ind_nairobi_as,8,3] = 5      #Initial infecteds (P) in Nairobi in the 30-34 age group
+        u0[KenyaCoV_MS.ind_nairobi_as,5,4] = 5#Five initial infecteds in Nairobi in the 20-24 age group
+        P.dt = dt;     #P.ext_inf_rate = 0.;    P.ϵ = ϵ;
+        P.δ = .1#δ;      P.γ = γ;      P.σ = σ;        #P.β = β;       P.μ₁=μ₁;                P.τ=1/2.;
+        P.β=R₀*P.γ/(P.δ + P.ϵ*(1-P.δ))
+        println("P.β=",P.β)
         P.MS_strategy=MS_strategies[i]
         prob = KenyaCoV_MS.create_KenyaCoV_non_neg_prob(u0,(0.,365.),P)
-        print("Simulating session ",session," sc ",sc_nb,"   -   ")
         @time sims = solve(EnsembleProblem(prob#=,prob_func=randomise_params=#,output_func = output_daily_and_final_incidence),
                             FunctionMap(),dt=P.dt,trajectories=n_traj)
-        sims_vector=[sims.u[i]      for i=1:size(sims.u,1)]
+        sims_vector=[]
+        for i=1:size(sims.u,1)
+            push!(sims_vector, sims.u[i])
+        end
         @save folder*"sims_sc"*string(sc_nb)*".jld2" sims_vector
     end
+    plot([sum(sims_vector[1][1][t])     for t = 1:1:365])
 end

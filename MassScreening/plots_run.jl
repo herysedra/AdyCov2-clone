@@ -3,7 +3,7 @@ include("plots_MS.jl")
     push!(LOAD_PATH, "./MassScreening")
     include("MS_functions.jl")
 
-sc=01;sims=string(1);
+sc=01;sims=string(5);
     session1=string(sc);session2=string(sc+1);session3=string(sc+2);session4=string(sc+3);
 ##########  Verify curves
 folders=["./MassScreening/session"*session1*"_"*sims*"sims/"]#,"./MassScreening/session"*session2*"_"*sims*"sims/"]
